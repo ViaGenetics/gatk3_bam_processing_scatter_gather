@@ -184,7 +184,6 @@ def main(bam_files, sampleId, padding, reference, loglevel, number_of_nodes,
     gatk_rtc_ir_jobs = []
     for job_name, file_objects in balanced_jobs_object.items():
 
-        # create GATK3 Realignment node
         logger.info("Create GATK3 Realignment Node")
         gatk_rtc_ir_jobs.append(
             dxpy.new_dxjob(
@@ -237,9 +236,33 @@ def main(bam_files, sampleId, padding, reference, loglevel, number_of_nodes,
             "advanced_br_options": advanced_br_options,
             "loglevel": loglevel
         },
-        fn_name="gatk_br",
+        fn_name="gatk_base_recalibrator",
         depends_on=[gather_gatk_rtc_ir_jobs]
     )
+
+    # GATK Apply BQSR
+
+    gatk_apply_bqsr_jobs = []
+    for gatk_rtc_ir_job in gatk_rtc_ir_jobs:
+
+        logger.info("Create GATK3 Apply BQSR Node")
+        gatk_apply_bqsr_jobs.append(
+            dxpy.new_dxjob(
+                fn_input={
+                    "bam_files": gatk_rtc_ir_job.get_output_ref("output_realigned_bams"),
+                    "BR_output": gatk_br_job.get_output_ref("output_bqsr"),
+                    "reference": reference,
+                    "regions_file": regions_file,
+                    "padding": padding,
+                    "dbsnp": dbsnp,
+                    "sampleId": sampleId,
+                    "advanced_pr_options": advanced_pr_options,
+                    "loglevel": loglevel
+                },
+                fn_name="gatk_apply_bqsr",
+                depends_on = gatk_rtc_ir_jobs + [gatk_br_job]
+            )
+        )
 
     return output
 
