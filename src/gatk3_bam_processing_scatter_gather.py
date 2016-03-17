@@ -160,6 +160,9 @@ def main(bam_files, sampleId, padding, reference, loglevel, number_of_nodes,
     :param: `advanced_pr_options`:
     """
 
+    logger.setLevel(loglevel)
+    logger.info("GATK3 scatter gather controller. Number of nodes for scatter jobs: {0}".format(number_of_nodes))
+
     # The following line(s) initialize your data object inputs on the platform
     # into dxpy.DXDataObject instances that you can start using immediately.
 
