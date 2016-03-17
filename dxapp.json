@@ -1,0 +1,268 @@
+{
+  "name": "gatk3_bam_processing_scatter_gather",
+  "title": "GATK3 best practices BAM preprocessing (scatter gather)",
+  "summary": "Implements the GATK 3.x best practices processing of BAM files. It receives MarkDuplicates BAM files as input, and refines them (by realigning, and recalibrating them) with scatter gather ",
+  "dxapi": "1.0.0",
+  "version": "0.0.1",
+  "categories": [
+    "Read Manipulation",
+    "Pipelines"
+  ],
+  "inputSpec": [
+    {
+      "name": "bam_files",
+      "label": "BAM files (Must be sorted and dedupped)",
+      "class": "array:file",
+      "patterns": ["*.bam"],
+      "optional": false
+    },
+    {
+      "name": "sampleId",
+      "label": "SampleId of sample being processed",
+      "class": "string",
+      "optional": false
+    },
+    {
+      "name": "regions_file",
+      "label": "File with exome regions",
+      "class": "file",
+      "patterns": ["*.bed", "*.interval_list"],
+      "optional": true,
+      "suggestions": [
+        {
+          "name": "exome_calling_regions.v1.interval_list",
+          "value": {
+            "$dnanexus_link": {
+              "project": "project-BY1v2Xj0VKgFyYv3zk4Bq125",
+              "id": "file-BY3K0B00VKg9Kg95bbykx1KQ"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "padding",
+      "label": "Extra padding to add to targets",
+      "class": "int",
+      "optional": true,
+      "default": 100
+    },
+    {
+      "name": "reference",
+      "label": "Reference genome (gzipped)",
+      "class": "file",
+      "patterns": ["*.fa.gz", "*.fasta.gz"],
+      "optional": false,
+      "suggestions": [
+        {
+          "name": "GRCh37 - hs37d5 (1000 Genomes Phase II)",
+          "value": {
+            "$dnanexus_link": {
+              "project": "project-BY1v2Xj0VKgFyYv3zk4Bq125",
+              "id": "file-B6ZY7VG2J35Vfvpkj8y0KZ01"
+            }
+          }
+        },
+        {
+          "name": "ucsc - hg19",
+          "value": {
+            "$dnanexus_link": {
+              "project": "project-BY1v2Xj0VKgFyYv3zk4Bq125",
+              "id": "file-BYG23G80VKg6gz64Y5xQyb2x"
+            }
+          }
+        },
+        {
+          "name": "DNAnexus Reference Genomes",
+          "project": "project-BQpp3Y804Y0xbyG4GJPQ01xv",
+          "path": "/"
+        }
+      ]
+    },
+    {
+      "name": "indel_vcf",
+      "label": "VCF files with established in/del variant calls",
+      "help": "Needed for recalibration of BAM files. Ensures higher quality variant calls",
+      "class": "array:file",
+      "patterns": ["*.vcf", "*.vcf.gz"],
+      "optional": true,
+      "suggestions": [
+        {
+          "name": "GRCh37 - 1000G_phase1",
+          "value": {
+            "$dnanexus_link": {
+              "project": "project-BY1v2Xj0VKgFyYv3zk4Bq125",
+              "id": "file-B5Gx17pxjkfk7KyjK4QQ00pG"
+            }
+          }
+        },
+        {
+          "name": "GRCh37 - Mills_and_1000G_gold_standard indels",
+          "value": {
+            "$dnanexus_link": {
+              "project": "project-BY1v2Xj0VKgFyYv3zk4Bq125",
+              "id": "file-B5Gx10Xxjkfx9xyk78bQ00kp"
+            }
+          }
+        },
+        {
+          "name": "hg19 - 1000G_phase1",
+          "value": {
+            "$dnanexus_link": {
+              "project": "project-BY1v2Xj0VKgFyYv3zk4Bq125",
+              "id": "file-BYG1zY80VKgJ64GF852VJGzv"
+            }
+          }
+        },
+        {
+          "name": "hg19 - Mills_and_1000G_gold_standard indels",
+          "value": {
+            "$dnanexus_link": {
+              "project": "project-BY1v2Xj0VKgFyYv3zk4Bq125",
+              "id": "file-BYG1zp80VKg304kXpxgZ984p"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "dbsnp",
+      "label": "dbSNP VCF",
+      "help": "Needed for recalibration of BAM files. Ensures higher quality variant calls",
+      "class": "file",
+      "patterns": ["*.vcf", "*.vcf.gz"],
+      "optional": true,
+      "suggestions": [
+        {
+          "name": "GRCh37 - dbSNP VCF",
+          "value": {
+            "$dnanexus_link": {
+              "project": "project-BY1v2Xj0VKgFyYv3zk4Bq125",
+              "id": "file-B5Gx01pxjkfzYbVP70bQ018F"
+            }
+          }
+        },
+        {
+          "name": "hg19 - dbSNP VCF",
+          "value": {
+            "$dnanexus_link": {
+              "project": "project-BY1v2Xj0VKgFyYv3zk4Bq125",
+              "id": "file-BYG1zyQ0VKg3JGFxYbxf81GF"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "advanced_rtc_options",
+      "label": "Advanced command line options (for RealignerTargetCreator)",
+      "class": "string",
+      "optional": true
+    },
+    {
+      "name": "advanced_ir_options",
+      "label": "Advanced command line options (for IndelRealigner)",
+      "class": "string",
+      "optional": true
+    },
+    {
+      "name": "advanced_br_options",
+      "label": "Advanced command line options (for BaseRecalibrator)",
+      "class": "string",
+      "optional": true
+    },
+    {
+      "name": "advanced_pr_options",
+      "label": "Advanced command line options (for PrintReads)",
+      "class": "string",
+      "optional": true,
+      "default": "--disable_indel_quals"
+    },
+    {
+      "name": "number_of_nodes",
+      "label": "Number of computational nodes to use when running scatter processes",
+      "class": "int",
+      "optional": false,
+      "default": 12
+    },
+    {
+      "name": "downsample",
+      "label": "Downsample BAMs for BaseRecalibrator?",
+      "class": "boolean",
+      "optional": false,
+      "default": true
+    },
+    {
+      "name": "downsample_fraction",
+      "label": "Downsample fraction (--dfrac)",
+      "class": "float",
+      "optional": true,
+      "default": 0.20
+    },
+    {
+      "name": "loglevel",
+      "label": "Logging Level",
+      "class": "string",
+      "optional": true,
+      "default": "INFO",
+      "choices": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+    }
+  ],
+  "outputSpec": [
+    {
+      "name": "output_recalibrated_bam",
+      "label": "Recalibrated BAM files",
+      "class": "array:file"
+    },
+    {
+      "name": "output_recalibrated_cram",
+      "label": "Recalibrated CRAM files",
+      "class": "array:file"
+    }
+  ],
+  "runSpec": {
+    "interpreter": "python2.7",
+    "file": "src/gatk3_bam_processing_scatter_gather.py",
+    "distribution": "Ubuntu",
+    "release": "14.04",
+    "execDepends": [
+      {
+        "name": "openjdk-7-jre-headless"
+      },
+      {
+        "name": "tabix"
+      },
+      {
+        "name": "dx_applet_utilities",
+        "package_manager": "git",
+        "url": "https://github.com/ViaGenetics/dx_applet_utilities.git",
+        "tag": "master",
+        "destdir": "~/"
+     }
+    ],
+    "systemRequirements":{
+      "main": {
+        "instanceType": "mem1_ssd1_x8"
+      }
+    },
+    "executionPolicy": {
+      "restartOn": {
+        "ExecutionError": 1,
+        "AppInternalError": 1
+      },
+      "maxRestarts": 2
+    },
+    "timeoutPolicy": {
+      "main": {
+        "hours": 4
+      }
+    }
+  },
+  "access": {
+    "network": ["*"]
+  },
+  "developers": [
+    "MGonz2015"
+  ],
+  "authorizedUsers": []
+}
