@@ -211,8 +211,10 @@ def main(bam_files, sampleId, padding, reference, loglevel, number_of_nodes,
     logger.info("Gather all GATK3 Realignment Output")
 
     kwargs = {
-        "output_downsample_bams": [job.get_output_ref("output_downsample_bams") for job in gatk_rtc_ir_jobs],
-        "output_realigned_bams": [job.get_output_ref("output_realigned_bams") for job in gatk_rtc_ir_jobs]
+        "output_downsample_bams": [job.get_output_ref("output_downsample_bams")
+            for job in gatk_rtc_ir_jobs],
+        "output_realigned_bams": [job.get_output_ref("output_realigned_bams")
+            for job in gatk_rtc_ir_jobs]
     }
 
     gather_gatk_rtc_ir_jobs = dxpy.new_dxjob(
@@ -269,8 +271,10 @@ def main(bam_files, sampleId, padding, reference, loglevel, number_of_nodes,
     logger.info("Gather all GATK Apply BQSR calling job outputs")
 
     kwargs = {
-        "output_recalibrated_bam": [job.get_output_ref("output_recalibrated_bam") for job in gatk_apply_bqsr_jobs],
-        "output_recalibrated_cram": [job.get_output_ref("output_recalibrated_cram") for job in gatk_apply_bqsr_jobs]
+        "output_recalibrated_bam": [job.get_output_ref("output_recalibrated_bam")
+            for job in gatk_apply_bqsr_jobs],
+        "output_recalibrated_cram": [job.get_output_ref("output_recalibrated_cram")
+            for job in gatk_apply_bqsr_jobs]
     }
 
     gather_gatk_apply_bqsr_jobs = dxpy.new_dxjob(
