@@ -13,10 +13,10 @@ for developers or advanced users, for example:
 This app has the following entry points:
 
 * main
-* scatter
-* map
-* process
-* postprocess
+* gatk_realignment
+* gatk_base_recalibrator
+* gatk_apply_bqsr
+* gather
 
 When running this app, you can override the instance type to be used for each
 entry point by providing the ``systemRequirements`` field to
@@ -24,11 +24,11 @@ entry point by providing the ``systemRequirements`` field to
 
     {
       systemRequirements: {
-        "main": {"instanceType": "mem2_hdd2_x2"},
-        "scatter": {"instanceType": "mem2_hdd2_x2"},
-        "map": {"instanceType": "mem2_hdd2_x2"},
-        "process": {"instanceType": "mem2_hdd2_x2"},
-        "postprocess": {"instanceType": "mem2_hdd2_x2"}
+        "main": {"instanceType": "mem1_ssd1_x2"},
+        "gatk_realignment": {"instanceType": "mem1_ssd1_x4"},
+        "gatk_base_recalibrator": {"instanceType": "mem1_ssd2_x8"},
+        "gatk_apply_bqsr": {"instanceType": "mem1_ssd1_x4"},
+        "gather": {"instanceType": "mem1_ssd1_x2"}
       },
       [...]
     }

@@ -244,10 +244,10 @@
       "main": {
         "instanceType": "mem1_ssd1_x2"
       },
-      "gatk_rtc_ir": {
+      "gatk_realignment": {
         "instanceType": "mem1_ssd1_x4"
       },
-      "gatk_br": {
+      "gatk_base_recalibrator": {
         "instanceType": "mem1_ssd2_x8"
       },
       "gatk_apply_bqsr": {
@@ -268,10 +268,10 @@
       "main": {
         "hours": 1
       },
-      "gatk_rtc_ir": {
+      "gatk_realignment": {
         "hours": 6
       },
-      "gatk_br": {
+      "gatk_base_recalibrator": {
         "hours": 6
       },
       "gatk_apply_bqsr": {
