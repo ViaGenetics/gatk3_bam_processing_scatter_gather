@@ -119,7 +119,8 @@ def gatk_realignment(bam_files, reference, sampleId, downsample,
         "in/",
         "genome/",
         "tmp/realignment/",
-        "out/output_bqsr/"
+        "out/realigned_bams/",
+        "out/downsampled_bams/"
     ]
 
     for temp_directory in temp_directories:
@@ -228,7 +229,7 @@ def gatk_realignment(bam_files, reference, sampleId, downsample,
         # 2. IndelRealigner
 
         ir_input = bam_file
-        ir_output = "tmp/realignment/{0}.realigned.bam".format(bam_file)
+        ir_output = "out/realigned_bams/{0}.realigned.bam".format(bam_file)
 
         ir_cmd = "java -Xmx{0}m -jar /opt/jar/GenomeAnalysisTK.jar ".format(max_ram)
         ir_cmd += "-T IndelRealigner {0} ".format(advanced_ir_options)
@@ -238,9 +239,28 @@ def gatk_realignment(bam_files, reference, sampleId, downsample,
         gatk_ir = dx_exec.execute_command(ir_cmd)
         dx_exec.check_execution_syscode(gatk_ir, "GATK IndelRealigner")
 
+        if downsample:
+            downsample_bam = "out/downsampled_bams/{0}.downsample.bam".format(bam_file)
+
+            downsample_cmd = "java -Xmx{0}m -jar /opt/jar/GenomeAnalysisTK.jar ".format(max_ram)
+            downsample_cmd += "-T PrintReads -R {0} ".format(reference_filename)
+            downsample_cmd += "-I {0} -o {1}".format(ir_output, downsample_bam)
+
+            gatk_ds = dx_exec.execute_command(downsample_cmd)
+            dx_exec.check_execution_syscode(gatk_ds, "GATK downsampling")
+
+        else:
+            placeholder = dx_exec.execute_command("touch out/downsampled_bams/downsample.bam")
+            dx_exec.check_execution_syscode(placeholder, "placeholder")
+
+
     # Remove index files - no need to store these for now :)
 
-    rm_bai_files_cmd = "rm -rf out/output_recalibrated_bam/*bai"
+    rm_bai_files_cmd = "rm -rf out/realigned_bams/*bai"
+    rm_bai_files = dx_exec.execute_command(rm_bai_files_cmd)
+    dx_exec.check_execution_syscode(rm_bai_files, "Remove *bai")
+
+    rm_bai_files_cmd = "rm -rf out/downsampled_bams/*bai"
     rm_bai_files = dx_exec.execute_command(rm_bai_files_cmd)
     dx_exec.check_execution_syscode(rm_bai_files, "Remove *bai")
 
