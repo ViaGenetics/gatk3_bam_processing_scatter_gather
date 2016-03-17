@@ -78,18 +78,7 @@ except ImportError:
     sys.exit(1)
 
 
-@dxpy.entry_point("postprocess")
-def postprocess(process_outputs, additional_input):
-    # This is the "gather" phase which aggregates and performs any
-    # additional computation after the "map" (and therefore after all
-    # the "process") jobs are done.
-
-    for item in process_outputs:
-        print item
-
-    return { "final_output": "postprocess placeholder output" }
-
-@dxpy.entry_point("process")
+@dxpy.entry_point("gatk_realignment")
 def process(scattered_input, additional_input):
     # Fill in code here to process the input and create output.
 
@@ -103,7 +92,35 @@ def process(scattered_input, additional_input):
 
     return { "process_output": "process placeholder output" }
 
-@dxpy.entry_point("map")
+
+@dxpy.entry_point("gatk_base_recalibrator")
+def process(scattered_input, additional_input):
+    # Fill in code here to process the input and create output.
+
+    # As always, you can choose not to return output if the
+    # "postprocess" stage does not require any input, e.g. rows have
+    # been added to a GTable that has been created in advance.  Just
+    # make sure that the "postprocess" job does not run until all
+    # "process" jobs have finished by making it wait for "map" to
+    # finish using the depends_on argument (this is already done for
+    # you in the invocation of the "postprocess" job in "main").
+
+    return { "process_output": "process placeholder output" }
+
+
+@dxpy.entry_point("gatk_apply_bqsr")
+def postprocess(process_outputs, additional_input):
+    # This is the "gather" phase which aggregates and performs any
+    # additional computation after the "map" (and therefore after all
+    # the "process") jobs are done.
+
+    for item in process_outputs:
+        print item
+
+    return { "final_output": "postprocess placeholder output" }
+
+
+@dxpy.entry_point("gather")
 def map_entry_point(array_of_scattered_input, process_input):
     # The following calls "process" for each of the items in
     # *array_of_scattered_input*, using as input the item in the
@@ -114,16 +131,34 @@ def map_entry_point(array_of_scattered_input, process_input):
         process_jobs.append(dxpy.new_dxjob(fn_input=process_input, fn_name="process"))
     return { "process_outputs": [subjob.get_output_ref("process_output") for subjob in process_jobs] }
 
-@dxpy.entry_point("scatter")
-def scatter(input_to_scatter):
-    # Fill in code here to do whatever is necessary to scatter the
-    # input.
-    array_of_scattered_input = []
-
-    return { "array_of_scattered_input": array_of_scattered_input }
 
 @dxpy.entry_point("main")
-def main(bam_files, sampleId, padding, reference, loglevel, number_of_nodes, downsample, downsample_fraction, regions_file=None, indel_vcf=None, dbsnp=None, advanced_rtc_options=None, advanced_ir_options=None, advanced_br_options=None, advanced_pr_options=None):
+def main(bam_files, sampleId, padding, reference, loglevel, number_of_nodes,
+    downsample, downsample_fraction, regions_file=None, indel_vcf=None,
+    dbsnp=None, advanced_rtc_options=None, advanced_ir_options=None,
+    advanced_br_options=None, advanced_pr_options=None):
+
+    """This is a dx applet that runs on the DNAnexus platform. This will run
+    GATK3 best practices pipeline using scatter gather. This is very useful for
+    processing WGS datasets. This function is the controller of the pipeline,
+    which will scatter data, process it and then gather it for final processing.
+
+    :param: `bam_files`:
+    :param: `sampleId`:
+    :param: `padding`:
+    :param: `reference`:
+    :param: `loglevel`:
+    :param: `downsample`:
+    :param: `downsample_fraction`:
+    :param: `regions_file`:
+    :param: `indel_vcf`:
+    :param: `dbsnp`:
+    :param: `loglevel`:
+    :param: `advanced_rtc_options`:
+    :param: `advanced_ir_options`:
+    :param: `advanced_br_options`:
+    :param: `advanced_pr_options`:
+    """
 
     # The following line(s) initialize your data object inputs on the platform
     # into dxpy.DXDataObject instances that you can start using immediately.
