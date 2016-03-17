@@ -185,7 +185,7 @@ def main(bam_files, sampleId, padding, reference, loglevel, number_of_nodes,
     for job_name, file_objects in balanced_jobs_object.items():
 
         # create GATK3 Realignment node
-        logger.info("Create GATK3 Realignment Job")
+        logger.info("Create GATK3 Realignment Node")
         gatk_rtc_ir_jobs.append(
             dxpy.new_dxjob(
                 fn_input={
@@ -204,6 +204,42 @@ def main(bam_files, sampleId, padding, reference, loglevel, number_of_nodes,
                 fn_name="gatk_realignment"
             )
         )
+
+    # GATK3 BaseRecalibrator phase
+
+    # This will gather the input from all the GATK3 Realignment nodes
+
+    logger.info("Gather all GATK3 Realignment Output")
+
+    kwargs = {
+        "output_downsample_bams": [job.get_output_ref("output_downsample_bams") for job in gatk_rtc_ir_jobs],
+        "output_realigned_bams": [job.get_output_ref("output_realigned_bams") for job in gatk_rtc_ir_jobs]
+    }
+
+    gather_gatk_rtc_ir_jobs = dxpy.new_dxjob(
+        fn_input=kwargs,
+        fn_name="gather",
+    	depends_on=gatk_rtc_ir_jobs
+    )
+
+    # This will send all the realigned BAM files to the BaseRecalibrator node
+
+    logger.info("Create GATK3 BaseRecalibrator Node")
+
+    gatk_br_job = dxpy.new_dxjob(
+        fn_input={
+            "bam_files": gather_gatk_rtc_ir_jobs.get_output_ref("output_downsample_bams") if downsample else gather_gatk_rtc_ir_jobs.get_output_ref("output_realigned_bams"),
+            "reference": reference,
+            "regions_file": regions_file,
+            "padding": padding,
+            "indel_vcf": indel_vcf,
+            "dbsnp": dbsnp,
+            "advanced_br_options": advanced_br_options,
+            "loglevel": loglevel
+        },
+        fn_name="gatk_br",
+        depends_on=[gather_gatk_rtc_ir_jobs]
+    )
 
     return output
 
