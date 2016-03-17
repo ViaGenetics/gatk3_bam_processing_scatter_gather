@@ -264,6 +264,25 @@ def main(bam_files, sampleId, padding, reference, loglevel, number_of_nodes,
             )
         )
 
+    # Gather all Apply BQSR output and finish the pipeline
+
+    logger.info("Gather all GATK Apply BQSR calling job outputs")
+
+    kwargs = {
+        "output_recalibrated_bam": [job.get_output_ref("output_recalibrated_bam") for job in gatk_apply_bqsr_jobs],
+        "output_recalibrated_cram": [job.get_output_ref("output_recalibrated_cram") for job in gatk_apply_bqsr_jobs]
+    }
+
+    gather_gatk_apply_bqsr_jobs = dxpy.new_dxjob(
+        fn_input=kwargs,
+        fn_name="gather",
+    	depends_on=gatk_apply_bqsr_jobs
+    )
+
+
+    output = {}
+    output["output_recalibrated_bam"] = gather_gatk_apply_bqsr_jobs.get_output_ref("output_recalibrated_bam")
+    output["output_recalibrated_cram"] = gather_gatk_apply_bqsr_jobs.get_output_ref("output_recalibrated_cram")
     return output
 
 dxpy.run()
