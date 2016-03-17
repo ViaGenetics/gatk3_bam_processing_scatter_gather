@@ -122,15 +122,20 @@ def postprocess(process_outputs, additional_input):
 
 
 @dxpy.entry_point("gather")
-def map_entry_point(array_of_scattered_input, process_input):
-    # The following calls "process" for each of the items in
-    # *array_of_scattered_input*, using as input the item in the
-    # array, as well as the rest of the fields in *process_input*.
-    process_jobs = []
-    for item in array_of_scattered_input:
-        process_input["scattered_input"] = item
-        process_jobs.append(dxpy.new_dxjob(fn_input=process_input, fn_name="process"))
-    return { "process_outputs": [subjob.get_output_ref("process_output") for subjob in process_jobs] }
+def map_entry_point(**kwargs):
+
+    """This takes care of gathering all input from scattered jobs."""
+
+    output = {}
+    for output_name, scatter_jobs in kwargs.items():
+        ret = []
+        for job in scatter_jobs:
+            for file_object in job:
+                ret.append(dxpy.dxlink(file_object["$dnanexus_link"]))
+
+        output[output_name] = ret
+
+    return output
 
 
 @dxpy.entry_point("main")
