@@ -168,11 +168,9 @@ def main(bam_files, sampleId, padding, reference, loglevel, number_of_nodes,
 
     file_sizes = {}
     file_objects = {}
-    gatk_rtc_ir_jobs = []
-
     for bam_file in bam_files:
-        file_size = int(dxpy.DXFile(bam_file).describe()['size'])
-        file_name = dxpy.DXFile(bam_file).describe()['name']
+        file_size = int(dxpy.DXFile(bam_file).describe()["size"])
+        file_name = dxpy.DXFile(bam_file).describe()["name"]
         file_sizes[file_name] = file_size
         file_objects[file_name] = bam_file
 
@@ -180,6 +178,32 @@ def main(bam_files, sampleId, padding, reference, loglevel, number_of_nodes,
         file_sizes=file_sizes,
         dx_file_objects=file_objects,
         number_of_nodes=number_of_nodes)
+
+    # GATK in/del realignment phase
+
+    gatk_rtc_ir_jobs = []
+    for job_name, file_objects in balanced_jobs_object.items():
+
+        # create GATK3 Realignment node
+        logger.info("Create GATK3 Realignment Job")
+        gatk_rtc_ir_jobs.append(
+            dxpy.new_dxjob(
+                fn_input={
+                    "bam_files": file_objects,
+                    "reference": reference,
+                    "regions_file": regions_file,
+                    "padding": padding,
+                    "indel_vcf": indel_vcf,
+                    "sampleId": sampleId,
+                    "advanced_rtc_options": advanced_rtc_options,
+                    "advanced_ir_options": advanced_ir_options,
+                    "downsample": downsample,
+                    "downsample_fraction": downsample_fraction,
+                    "loglevel": loglevel
+                },
+                fn_name="gatk_realignment"
+            )
+        )
 
     return output
 
