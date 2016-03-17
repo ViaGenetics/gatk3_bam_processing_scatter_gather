@@ -100,6 +100,166 @@ def gatk_realignment(bam_files, reference, sampleId, downsample,
     :returns: An array of file objects for the GATK Realignment command output
     """
 
+    # Set up string variables that are not required
+
+    if not advanced_pr_options:
+        advanced_pr_options = ""
+
+    # Set up execution environment
+
+    logger.setLevel(loglevel)
+    cpus = dx_resources.number_of_cpus(1.0)
+    max_ram = dx_resources.max_memory(0.85)
+    logger.info("# of CPUs:{0}\nMax RAM:{1}".format(cpus, max_ram))
+
+    temp_directories = [
+        "in/",
+        "genome/",
+        "tmp/realignment/",
+        "out/output_bqsr/"
+    ]
+
+    for temp_directory in temp_directories:
+        create_dir = dx_exec.execute_command("mkdir -p {0}".format(
+            temp_directory))
+        dx_exec.check_execution_syscode(create_dir, "Created: {0}".format(
+            temp_directory))
+        chmod_dir = dx_exec.execute_command("chmod 777 -R {0}".format(
+            temp_directory))
+        dx_exec.check_execution_syscode(chmod_dir, "Modified: {0}".format(
+            temp_directory))
+
+    # The following line(s) initialize your data object inputs on the platform
+    # into dxpy.DXDataObject instances that you can start using immediately.
+
+    reference_filename = "in/reference/{0}".format(
+        dxpy.DXFile(reference).describe()["name"])
+
+    bam_filenames = []
+    for index, bam_file in enumerate(bam_files):
+
+        # DNAnexus has this funky behavior when you have > 9 files, it creates
+        # a folder in/parameter/08/file - this resolves that issue
+        if len(bam_files) > 9 and index < 10:
+            index = "0{0}".format(index)
+
+        bam_filenames.append("in/bam_files/{0}/{1}".format(index,
+            dxpy.DXFile(bam_file).describe()["name"]))
+
+    indel_vcf_files = []
+    known_parameter = ""
+    if indel_vcf:
+        for index, file_object in enumerate(indel_vcf):
+            filename = "in/indel_vcf/{0}/{1}".format(index,
+                dxpy.DXFile(file_object).describe()["name"])
+            indel_vcf_files.append(filename)
+            known_parameter += "-knownSites {0} ".format(filename)
+
+    regions_parameter = ""
+    if regions_file:
+        regions_file = "in/regions_file/{0}".format(
+            dxpy.DXFile(regions_file).describe()["name"])
+        regions_parameter = "-L {0} ".format(regions_file)
+
+        if padding:
+            regions_parameter += "-ip {0} ".format(padding)
+
+    # The following line(s) download your file inputs to the local file system
+    # using variable names for the filenames.
+
+    dx_download_inputs_cmd = "dx-download-all-inputs --parallel"
+    download_inputs = dx_exec.execute_command(dx_download_inputs_cmd)
+    dx_exec.check_execution_syscode(download_inputs, "Download input files")
+
+    # The following line(s) are the body of the applet that
+    # executes the bioinformatics processes
+
+    # Prepare refernce genome for GATK
+
+    unzip_reference_genome_cmd = "gzip -dc {0} > genome/genome.fa".format(
+        reference_filename)
+    unzip_reference_genome = dx_exec.execute_command(unzip_reference_genome_cmd)
+    dx_exec.check_execution_syscode(unzip_reference_genome, "Unzip reference genome")
+    reference_filename = "genome/genome.fa"
+
+    reference_faidx_cmd = "samtools faidx {0}".format(reference_filename)
+    reference_faidx = dx_exec.execute_command(reference_faidx_cmd)
+    dx_exec.check_execution_syscode(reference_faidx, "Reference samtools faidx")
+
+    reference_dict = "genome/genome.dict"
+    reference_dict_cmd = "samtools dict {0} > {1}".format(reference_filename, reference_dict)
+    reference_dict = dx_exec.execute_command(reference_dict_cmd)
+    dx_exec.check_execution_syscode(reference_dict, "Reference samtools dict")
+
+    # Index VCFs for GATK using tabix
+
+    if indel_vcf:
+        for vcf_file in indel_vcf_files:
+            indel_vcf_tabix_cmd = "tabix -p vcf {0}".format(vcf_file)
+            indel_vcf_tabix = dx_exec.execute_command(indel_vcf_tabix_cmd)
+            dx_exec.check_execution_syscode(indel_vcf_tabix, "Tabix of {0}".format(vcf_file))
+
+    # GATK in/del realignment phase
+
+    for bam_file in bam_filenames:
+
+        # 1. RealignerTargetCreator
+
+        rtc_input = bam_file
+        rtc_output = "tmp/realignment/{0}.realign.intervals".format(bam_file)
+
+        rtc_cmd = "java -Xmx{0}m -jar /opt/jar/GenomeAnalysisTK.jar ".format(max_ram)
+        rtc_cmd += "-T RealignerTargetCreator {0} -nt {1} ".format(
+            advanced_rtc_options, cpus)
+        rtc_cmd += " -R {0} {1} {2} -I {3} -o {4}".format(reference_filename,
+            known_parameter, regions_parameter, rtc_input, rtc_output)
+
+        # Need to index BAM file for GATK
+        idx_rtc_input_cmd = "sambamba index -p -t {0} {1}".format(cpus, rtc_input)
+        idx_rtc_input = dx_exec.execute_command(idx_rtc_input_cmd)
+        dx_exec.check_execution_syscode(idx_rtc_input, "Index BAM file")
+
+        gatk_rtc = dx_exec.execute_command(rtc_cmd)
+        dx_exec.check_execution_syscode(gatk_rtc, "GATK RealignerTargetCreator")
+
+        # 2. IndelRealigner
+
+        ir_input = bam_file
+        ir_output = "tmp/realignment/{0}.realigned.bam".format(bam_file)
+
+        ir_cmd = "java -Xmx{0}m -jar /opt/jar/GenomeAnalysisTK.jar ".format(max_ram)
+        ir_cmd += "-T IndelRealigner {0} ".format(advanced_ir_options)
+        ir_cmd += "-R {0} -targetIntervals {1} ".format(reference_filename, rtc_output)
+        ir_cmd += "{0} -I {1} -o {2}".format(known_parameter, ir_input, ir_output)
+
+        gatk_ir = dx_exec.execute_command(ir_cmd)
+        dx_exec.check_execution_syscode(gatk_ir, "GATK IndelRealigner")
+
+    # Remove index files - no need to store these for now :)
+
+    rm_bai_files_cmd = "rm -rf out/output_recalibrated_bam/*bai"
+    rm_bai_files = dx_exec.execute_command(rm_bai_files_cmd)
+    dx_exec.check_execution_syscode(rm_bai_files, "Remove *bai")
+
+    # The following line(s) use the Python bindings to upload your file outputs
+    # after you have created them on the local file system.  It assumes that you
+    # have used the output field name for the filename for each output, but you
+    # can change that behavior to suit your needs.
+
+    dx_upload_outputs_cmd = "dx-upload-all-outputs --parallel"
+    download_outputs = dx_exec.execute_command(dx_upload_outputs_cmd)
+    dx_exec.check_execution_syscode(download_outputs, "Upload outputs")
+
+    # The following line fills in some basic dummy output and assumes
+    # that you have created variables to represent your output with
+    # the same name as your output fields.
+
+    upload_output_object = dx_utils.load_json_from_file("job_output.json")
+    return dx_utils.prepare_job_output(
+        dx_output_object=upload_output_object,
+        must_be_array=False
+    )
+
 
 @dxpy.entry_point("gatk_base_recalibrator")
 def gatk_base_recalibrator(bam_files, reference, regions_file=None, padding=None,
