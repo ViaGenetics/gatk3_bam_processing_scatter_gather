@@ -102,8 +102,11 @@ def gatk_realignment(bam_files, reference, sampleId, downsample,
 
     # Set up string variables that are not required
 
-    if not advanced_pr_options:
-        advanced_pr_options = ""
+    if not advanced_rtc_options:
+        advanced_rtc_options = ""
+
+    if not advanced_ir_options:
+        advanced_ir_options = ""
 
     # Set up execution environment
 
