@@ -72,7 +72,8 @@ try:
     from dx_applet_utilities import (
         common_job_operations as dx_utils,
         manage_command_execution as dx_exec,
-        prepare_job_resources as dx_resources)
+        prepare_job_resources as dx_resources,
+        prepare_scatter_gather_jobs as dx_scatter)
 except ImportError:
     logger.error("Make sure to add the dx_applet_utilities to execDepends in dxapp.json!")
     sys.exit(1)
@@ -148,12 +149,12 @@ def main(bam_files, sampleId, padding, reference, loglevel, number_of_nodes,
     :param: `padding`:
     :param: `reference`:
     :param: `loglevel`:
+    :param: `number_of_nodes`
     :param: `downsample`:
     :param: `downsample_fraction`:
     :param: `regions_file`:
     :param: `indel_vcf`:
     :param: `dbsnp`:
-    :param: `loglevel`:
     :param: `advanced_rtc_options`:
     :param: `advanced_ir_options`:
     :param: `advanced_br_options`:
@@ -162,6 +163,23 @@ def main(bam_files, sampleId, padding, reference, loglevel, number_of_nodes,
 
     logger.setLevel(loglevel)
     logger.info("GATK3 scatter gather controller. Number of nodes for scatter jobs: {0}".format(number_of_nodes))
+
+    # Balance jobs based on the file sizes of file from input
+
+    file_sizes = {}
+    file_objects = {}
+    gatk_rtc_ir_jobs = []
+
+    for bam_file in bam_files:
+        file_size = int(dxpy.DXFile(bam_file).describe()['size'])
+        file_name = dxpy.DXFile(bam_file).describe()['name']
+        file_sizes[file_name] = file_size
+        file_objects[file_name] = bam_file
+
+    balanced_jobs_object = dx_scatter.distribute_files_by_size(
+        file_sizes=file_sizes,
+        dx_file_objects=file_objects,
+        number_of_nodes=number_of_nodes)
 
     return output
 
