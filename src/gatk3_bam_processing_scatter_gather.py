@@ -761,7 +761,6 @@ def main(bam_files, sampleId, padding, reference, loglevel, number_of_nodes,
     	depends_on=gatk_apply_bqsr_jobs
     )
 
-
     output = {}
     output["output_recalibrated_bam"] = gather_gatk_apply_bqsr_jobs.get_output_ref("output_recalibrated_bam")
     output["output_recalibrated_cram"] = gather_gatk_apply_bqsr_jobs.get_output_ref("output_recalibrated_cram")
