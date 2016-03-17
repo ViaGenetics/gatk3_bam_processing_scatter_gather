@@ -242,7 +242,19 @@
     ],
     "systemRequirements":{
       "main": {
-        "instanceType": "mem1_ssd1_x8"
+        "instanceType": "mem1_ssd1_x2"
+      },
+      "gatk_rtc_ir": {
+        "instanceType": "mem1_ssd1_x4"
+      },
+      "gatk_br": {
+        "instanceType": "mem1_ssd2_x8"
+      },
+      "gatk_apply_bqsr": {
+        "instanceType": "mem1_ssd1_x4"
+      },
+      "gather": {
+        "instanceType": "mem1_ssd1_x2"
       }
     },
     "executionPolicy": {
@@ -254,12 +266,26 @@
     },
     "timeoutPolicy": {
       "main": {
-        "hours": 4
+        "hours": 1
+      },
+      "gatk_rtc_ir": {
+        "hours": 6
+      },
+      "gatk_br": {
+        "hours": 6
+      },
+      "gatk_apply_bqsr": {
+        "hours": 8
+      },
+      "gather": {
+        "hours": 1
       }
     }
   },
   "access": {
-    "network": ["*"]
+    "network": ["*"],
+    "project": "CONTRIBUTE",
+    "allProjects": "VIEW"
   },
   "developers": [
     "MGonz2015"
