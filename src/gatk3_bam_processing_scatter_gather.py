@@ -156,7 +156,7 @@ def gatk_realignment(bam_files, reference, sampleId, downsample,
             filename = "in/indel_vcf/{0}/{1}".format(index,
                 dxpy.DXFile(file_object).describe()["name"])
             indel_vcf_files.append(filename)
-            known_parameter += "-knownSites {0} ".format(filename)
+            known_parameter += "-known {0} ".format(filename)
 
     regions_parameter = ""
     if regions_file:
