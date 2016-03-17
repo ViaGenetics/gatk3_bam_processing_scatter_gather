@@ -223,7 +223,7 @@ def gatk_realignment(bam_files, reference, sampleId, downsample,
         idx_rtc_input = dx_exec.execute_command(idx_rtc_input_cmd)
         dx_exec.check_execution_syscode(idx_rtc_input, "Index BAM file")
 
-        gatk_rtc = dx_exec.execute_command(rtc_cmd)
+        gatk_rtc = dx_exec.execute_command(rtc_cmd, debug=True)
         dx_exec.check_execution_syscode(gatk_rtc, "GATK RealignerTargetCreator")
 
         # 2. IndelRealigner
@@ -236,7 +236,7 @@ def gatk_realignment(bam_files, reference, sampleId, downsample,
         ir_cmd += "-R {0} -targetIntervals {1} ".format(reference_filename, rtc_output)
         ir_cmd += "{0} -I {1} -o {2}".format(known_parameter, ir_input, ir_output)
 
-        gatk_ir = dx_exec.execute_command(ir_cmd)
+        gatk_ir = dx_exec.execute_command(ir_cmd, debug=True)
         dx_exec.check_execution_syscode(gatk_ir, "GATK IndelRealigner")
 
         if downsample:
@@ -304,8 +304,8 @@ def gatk_base_recalibrator(bam_files, reference, regions_file=None, padding=None
 
     # Set up string variables that are not required
 
-    if not advanced_pr_options:
-        advanced_pr_options = ""
+    if not advanced_br_options:
+        advanced_br_options = ""
 
     # Set up execution environment
 
@@ -432,7 +432,7 @@ def gatk_base_recalibrator(bam_files, reference, regions_file=None, padding=None
     br_cmd += "-R {0} {1} {2} -I {3} -o {4}".format(reference_filename,
         knownsites_parameter, regions_parameter, br_input, br_output)
 
-    gatk_br = dx_exec.execute_command(br_cmd)
+    gatk_br = dx_exec.execute_command(br_cmd, debug=True)
     dx_exec.check_execution_syscode(gatk_br, "GATK BaseRecalibrator")
 
     # The following line(s) use the Python bindings to upload your file outputs
@@ -572,7 +572,7 @@ def gatk_apply_bqsr(bam_files, gatk_br_output, reference, sampleId,
         idx_bam = dx_exec.execute_command(idx_bam_cmd)
         dx_exec.check_execution_syscode(idx_bam, "Index BAM file")
 
-        gatk_pr = dx_exec.execute_command(pr_cmd)
+        gatk_pr = dx_exec.execute_command(pr_cmd, debug=True)
         dx_exec.check_execution_syscode(gatk_pr, "GATK Apply BQSR")
 
         # Convert recalibrated BAM to CRAM for archiving (Variant callers will
