@@ -80,18 +80,25 @@ except ImportError:
 
 
 @dxpy.entry_point("gatk_realignment")
-def process(scattered_input, additional_input):
-    # Fill in code here to process the input and create output.
+def gatk_realignment(bam_files, reference, sampleId, downsample,
+    downsample_fraction=None, regions_file=None, padding=None, indel_vcf=None,
+    advanced_rtc_options=None, advanced_ir_options=None, loglevel=None):
 
-    # As always, you can choose not to return output if the
-    # "postprocess" stage does not require any input, e.g. rows have
-    # been added to a GTable that has been created in advance.  Just
-    # make sure that the "postprocess" job does not run until all
-    # "process" jobs have finished by making it wait for "map" to
-    # finish using the depends_on argument (this is already done for
-    # you in the invocation of the "postprocess" job in "main").
+    """Starts with scattered BAM files to run GATK Realignment.
 
-    return { "process_output": "process placeholder output" }
+    :param: `bam_files`:
+    :param: `reference`:
+    :param: `sampleId`:
+    :param: `downsample`:
+    :param: `downsample_fraction`:
+    :param: `regions_file`:
+    :param: `padding`
+    :param: `indel_vcf`:
+    :param: `advanced_rtc_options`:
+    :param: `advanced_ir_options`:
+    :param: `loglevel`:
+    :returns: An array of file objects for the GATK Realignment command output
+    """
 
 
 @dxpy.entry_point("gatk_base_recalibrator")
