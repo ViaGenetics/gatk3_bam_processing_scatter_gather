@@ -110,15 +110,195 @@ def process(scattered_input, additional_input):
 
 
 @dxpy.entry_point("gatk_apply_bqsr")
-def postprocess(process_outputs, additional_input):
-    # This is the "gather" phase which aggregates and performs any
-    # additional computation after the "map" (and therefore after all
-    # the "process") jobs are done.
+def gatk_apply_bqsr(bam_files, gatk_br_output, reference, sampleId, dbsnp=None,
+    regions_file=None, padding=None, advanced_pr_options=None, loglevel=None):
 
-    for item in process_outputs:
-        print item
+    """Takes the output from scattered GATK Realignment jobs (gatk_realignment)
+    and the output of GATK BaseRecalibrator job (gatk_base_recalibrator) to run
+    GATK PrintReads -BQSR
 
-    return { "final_output": "postprocess placeholder output" }
+    :param: `bam_files`:
+    :param: `gatk_br_output`:
+    :param: `reference`:
+    :param: `sampleId`:
+    :param: `dbsnp`:
+    :param: `regions_file`:
+    :param: `padding`
+    :param: `advanced_pr_options`:
+    :param: `loglevel`:
+    :returns: Array of dx file objects that are recalibrated BAM and CRAM files
+    """
+
+    # Set up string variables that are not required
+
+    if not advanced_pr_options:
+        advanced_pr_options = ""
+
+    # Set up execution environment
+
+    logger.setLevel(loglevel)
+    cpus = dx_resources.number_of_cpus(1.0)
+    max_ram = dx_resources.max_memory(0.85)
+    logger.info("# of CPUs:{0}\nMax RAM:{1}".format(cpus, max_ram))
+
+    temp_directories = [
+        "in/",
+        "genome/",
+        "out/output_recalibrated_bam/",
+        "out/output_recalibrated_cram/",
+        "tmp/recalibration/"
+    ]
+
+    for temp_directory in temp_directories:
+        create_dir = dx_exec.execute_command("mkdir -p {0}".format(
+            temp_directory))
+        dx_exec.check_execution_syscode(create_dir, "Created: {0}".format(
+            temp_directory))
+        chmod_dir = dx_exec.execute_command("chmod 777 -R {0}".format(
+            temp_directory))
+        dx_exec.check_execution_syscode(chmod_dir, "Modified: {0}".format(
+            temp_directory))
+
+    # The following line(s) initialize your data object inputs on the platform
+    # into dxpy.DXDataObject instances that you can start using immediately.
+
+    reference_filename = "in/reference/{0}".format(
+        dxpy.DXFile(reference).describe()["name"])
+
+    bam_filenames = []
+    for index, bam_file in enumerate(bam_files):
+
+        # DNAnexus has this funky behavior when you have > 9 files, it creates
+        # a folder in/parameter/08/file - this resolves that issue
+        if len(bam_files) > 9 and index < 10:
+            index = "0{0}".format(index)
+
+        bam_filenames.append("in/bam_files/{0}/{1}".format(index,
+            dxpy.DXFile(bam_file).describe()["name"]))
+
+    indel_vcf_files = []
+    known_parameter = ""
+    knownsites_parameter = ""
+    if indel_vcf:
+        for index, file_object in enumerate(indel_vcf):
+            filename = "in/indel_vcf/{0}/{1}".format(index,
+                dxpy.DXFile(file_object).describe()["name"])
+            indel_vcf_files.append(filename)
+            known_parameter += "-known {0} ".format(filename)
+            knownsites_parameter += "-knownSites {0} ".format(filename)
+
+    dbsnp_parameter = ""
+    if dbsnp:
+        dbsnp = "in/dbsnp/{0}".format(dxpy.DXFile(dbsnp).describe()["name"])
+        dbsnp_parameter = "--dbsnp {0} ".format(dbsnp)
+        knownsites_parameter += "-knownSites {0} ".format(dbsnp)
+
+    regions_parameter = ""
+    if regions_file:
+        regions_file = "in/regions_file/{0}".format(
+            dxpy.DXFile(regions_file).describe()["name"])
+        regions_parameter = "-L {0} ".format(regions_file)
+
+        if padding:
+            regions_parameter += "-ip {0} ".format(padding)
+
+    # The following line(s) download your file inputs to the local file system
+    # using variable names for the filenames.
+
+    dx_download_inputs_cmd = "dx-download-all-inputs --parallel"
+    download_inputs = dx_exec.execute_command(dx_download_inputs_cmd)
+    dx_exec.check_execution_syscode(download_inputs, "Download input files")
+
+    # The following line(s) are the body of the applet that
+    # executes the bioinformatics processes
+
+    # Prepare refernce genome for GATK
+
+    unzip_reference_genome_cmd = "gzip -dc {0} > genome/genome.fa".format(
+        reference_filename)
+    unzip_reference_genome = dx_exec.execute_command(unzip_reference_genome_cmd)
+    dx_exec.check_execution_syscode(unzip_reference_genome, "Unzip reference genome")
+    reference_filename = "genome/genome.fa"
+
+    reference_faidx_cmd = "samtools faidx {0}".format(reference_filename)
+    reference_faidx = dx_exec.execute_command(reference_faidx_cmd)
+    dx_exec.check_execution_syscode(reference_faidx, "Reference samtools faidx")
+
+    reference_dict = "genome/genome.dict"
+    reference_dict_cmd = "samtools dict {0} > {1}".format(reference_filename, reference_dict)
+    reference_dict = dx_exec.execute_command(reference_dict_cmd)
+    dx_exec.check_execution_syscode(reference_dict, "Reference samtools dict")
+
+    # Index VCFs for GATK using tabix
+
+    if dbsnp:
+        dbsnp_tabix_cmd = "tabix -p vcf {0}".format(dbsnp)
+        dbsnp_tabix = dx_exec.execute_command(dbsnp_tabix_cmd)
+        dx_exec.check_execution_syscode(dbsnp_tabix, "Tabix of dbSNP VCF")
+
+    if indel_vcf:
+        for vcf_file in indel_vcf_files:
+            indel_vcf_tabix_cmd = "tabix -p vcf {0}".format(vcf_file)
+            indel_vcf_tabix = dx_exec.execute_command(indel_vcf_tabix_cmd)
+            dx_exec.check_execution_syscode(indel_vcf_tabix, "Tabix of {0}".format(vcf_file))
+
+    # GATK PrintReads -BQSR
+
+    for bam_file in bam_filenames:
+        pr_input = bam_file
+        pr_output = "out/output_recalibrated_bam/{0}.recalibrated.bam".format(sampleId)
+
+        pr_cmd = "java -Xmx{0}m -jar /opt/jar/GenomeAnalysisTK.jar ".format(max_ram)
+        pr_cmd += "-T PrintReads {0} -R {1} ".format(advanced_pr_options, reference_filename)
+        pr_cmd += "-BQSR {0} -I {1} -o {2}".format(br_output, pr_input, pr_output)
+
+        idx_bam_cmd = "sambamba index -p -t {0} {1}".format(cpus, bam_file)
+        idx_bam = dx_exec.execute_command(idx_bam_cmd)
+        dx_exec.check_execution_syscode(idx_bam, "Index BAM file")
+
+        gatk_pr = dx_exec.execute_command(pr_cmd)
+        dx_exec.check_execution_syscode(gatk_pr, "GATK Apply BQSR")
+
+        # Convert recalibrated BAM to CRAM for archiving (Variant callers will
+        # support variant calling from CRAM soon!)
+
+        cram_file = "out/output_recalibrated_cram/{0}.recalibrated.cram".format(
+            sampleId)
+        cram_cmd = "sambamba view -f cram -t {0} -T {1} {2} -o {3}".format(
+            cpus, reference_filename, pr_output, cram_file)
+
+        cram = dx_exec.execute_command(cram_cmd)
+        dx_exec.check_execution_syscode(cram, "Convert BAM to CRAM")
+
+    # Remove index files - no need to store these for now :)
+
+    rm_bai_files_cmd = "rm -rf out/output_recalibrated_bam/*bai"
+    rm_cai_files_cmd = "rm -rf out/output_recalibrated_cram/*cai"
+
+    rm_bai_files = dx_exec.execute_command(rm_bai_files_cmd)
+    dx_exec.check_execution_syscode(rm_bai_files, "Remove *bai")
+
+    rm_cai_files = dx_exec.execute_command(rm_cai_files_cmd)
+    dx_exec.check_execution_syscode(rm_cai_files, "Remove *cai")
+
+    # The following line(s) use the Python bindings to upload your file outputs
+    # after you have created them on the local file system.  It assumes that you
+    # have used the output field name for the filename for each output, but you
+    # can change that behavior to suit your needs.
+
+    dx_upload_outputs_cmd = "dx-upload-all-outputs --parallel"
+    download_outputs = dx_exec.execute_command(dx_upload_outputs_cmd)
+    dx_exec.check_execution_syscode(download_outputs, "Upload outputs")
+
+    # The following line fills in some basic dummy output and assumes
+    # that you have created variables to represent your output with
+    # the same name as your output fields.
+
+    upload_output_object = dx_utils.load_json_from_file("job_output.json")
+    return dx_utils.prepare_job_output(
+        dx_output_object=upload_output_object,
+        must_be_array=False
+    )
 
 
 @dxpy.entry_point("gather")
