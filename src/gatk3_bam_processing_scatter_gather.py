@@ -228,8 +228,8 @@ def gatk_realignment(bam_files, reference, sampleId, downsample,
 
         # 2. IndelRealigner
 
-        ir_input = bam_file
-        ir_output = "out/realigned_bams/{0}.realigned.bam".format(bam_file)
+        ir_input = os.path.basename(bam_file)
+        ir_output = "out/realigned_bams/{0}.realigned.bam".format(ir_input)
 
         ir_cmd = "java -Xmx{0}m -jar /opt/jar/GenomeAnalysisTK.jar ".format(max_ram)
         ir_cmd += "-T IndelRealigner {0} ".format(advanced_ir_options)
