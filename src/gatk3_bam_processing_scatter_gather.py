@@ -95,22 +95,28 @@ def process(scattered_input, additional_input):
 
 
 @dxpy.entry_point("gatk_base_recalibrator")
-def process(scattered_input, additional_input):
-    # Fill in code here to process the input and create output.
+def gatk_base_recalibrator(bam_files, reference, regions_file=None, padding=None,
+    indel_vcf=None, dbsnp=None, advanced_br_options=None, loglevel=None):
 
-    # As always, you can choose not to return output if the
-    # "postprocess" stage does not require any input, e.g. rows have
-    # been added to a GTable that has been created in advance.  Just
-    # make sure that the "postprocess" job does not run until all
-    # "process" jobs have finished by making it wait for "map" to
-    # finish using the depends_on argument (this is already done for
-    # you in the invocation of the "postprocess" job in "main").
+    """Takes the output from scattered GATK Realignment jobs (gatk_realignment)
+    to run GATK BaseRecalibrator job (gatk_base_recalibrator)
+
+    :param: `bam_files`:
+    :param: `reference`:
+    :param: `regions_file`:
+    :param: `padding`
+    :param: `indel_vcf`:
+    :param: `dbsnp`:
+    :param: `advanced_br_options`:
+    :param: `loglevel`:
+    :returns: A file object for the GATK BaseRecalibrator command output
+    """
 
     return { "process_output": "process placeholder output" }
 
 
 @dxpy.entry_point("gatk_apply_bqsr")
-def gatk_apply_bqsr(bam_files, gatk_br_output, reference, sampleId, dbsnp=None,
+def gatk_apply_bqsr(bam_files, gatk_br_output, reference, sampleId,
     regions_file=None, padding=None, advanced_pr_options=None, loglevel=None):
 
     """Takes the output from scattered GATK Realignment jobs (gatk_realignment)
@@ -121,7 +127,6 @@ def gatk_apply_bqsr(bam_files, gatk_br_output, reference, sampleId, dbsnp=None,
     :param: `gatk_br_output`:
     :param: `reference`:
     :param: `sampleId`:
-    :param: `dbsnp`:
     :param: `regions_file`:
     :param: `padding`
     :param: `advanced_pr_options`:
@@ -176,23 +181,6 @@ def gatk_apply_bqsr(bam_files, gatk_br_output, reference, sampleId, dbsnp=None,
         bam_filenames.append("in/bam_files/{0}/{1}".format(index,
             dxpy.DXFile(bam_file).describe()["name"]))
 
-    indel_vcf_files = []
-    known_parameter = ""
-    knownsites_parameter = ""
-    if indel_vcf:
-        for index, file_object in enumerate(indel_vcf):
-            filename = "in/indel_vcf/{0}/{1}".format(index,
-                dxpy.DXFile(file_object).describe()["name"])
-            indel_vcf_files.append(filename)
-            known_parameter += "-known {0} ".format(filename)
-            knownsites_parameter += "-knownSites {0} ".format(filename)
-
-    dbsnp_parameter = ""
-    if dbsnp:
-        dbsnp = "in/dbsnp/{0}".format(dxpy.DXFile(dbsnp).describe()["name"])
-        dbsnp_parameter = "--dbsnp {0} ".format(dbsnp)
-        knownsites_parameter += "-knownSites {0} ".format(dbsnp)
-
     regions_parameter = ""
     if regions_file:
         regions_file = "in/regions_file/{0}".format(
@@ -228,19 +216,6 @@ def gatk_apply_bqsr(bam_files, gatk_br_output, reference, sampleId, dbsnp=None,
     reference_dict_cmd = "samtools dict {0} > {1}".format(reference_filename, reference_dict)
     reference_dict = dx_exec.execute_command(reference_dict_cmd)
     dx_exec.check_execution_syscode(reference_dict, "Reference samtools dict")
-
-    # Index VCFs for GATK using tabix
-
-    if dbsnp:
-        dbsnp_tabix_cmd = "tabix -p vcf {0}".format(dbsnp)
-        dbsnp_tabix = dx_exec.execute_command(dbsnp_tabix_cmd)
-        dx_exec.check_execution_syscode(dbsnp_tabix, "Tabix of dbSNP VCF")
-
-    if indel_vcf:
-        for vcf_file in indel_vcf_files:
-            indel_vcf_tabix_cmd = "tabix -p vcf {0}".format(vcf_file)
-            indel_vcf_tabix = dx_exec.execute_command(indel_vcf_tabix_cmd)
-            dx_exec.check_execution_syscode(indel_vcf_tabix, "Tabix of {0}".format(vcf_file))
 
     # GATK PrintReads -BQSR
 
